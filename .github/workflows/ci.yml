@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    container: rust:1.85-bookworm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check
+        run: cargo check --release
+
+      - name: Clippy
+        run: cargo clippy --release -- -D warnings
+
+      - name: Format
+        run: rustfmt --check src/*.rs
+
+      - name: Test
+        run: cargo test
+
+  build:
+    runs-on: ubuntu-latest
+    container: rust:1.85-bookworm
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: sc
+          path: target/release/sc
