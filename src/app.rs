@@ -94,10 +94,12 @@ impl App {
             Message::ChangeResolution(mode) => {
                 if let Some(sel) = self.selected {
                     if sel < self.outputs.len() {
+                        let old_w = self.outputs[sel].width;
+                        let old_h = self.outputs[sel].height;
                         self.outputs[sel].width = mode.width;
                         self.outputs[sel].height = mode.height;
                         self.outputs[sel].current_mode = mode;
-                        self.snap_output(sel);
+                        self.adjust_neighbors(sel, old_w, old_h);
                     }
                 }
             }
@@ -250,6 +252,40 @@ impl App {
 
         self.outputs[idx].x = best_x;
         self.outputs[idx].y = best_y;
+    }
+
+    fn adjust_neighbors(&mut self, idx: usize, old_w: i32, old_h: i32) {
+        let out = &self.outputs[idx];
+        let (ox, oy) = (out.x, out.y);
+        let (new_w, new_h) = (out.width, out.height);
+
+        for i in 0..self.outputs.len() {
+            if i == idx {
+                continue;
+            }
+            let other = &mut self.outputs[i];
+
+            // Touching right edge: shift horizontally
+            if other.x == ox + old_w {
+                other.x = ox + new_w;
+            }
+            // Touching left edge: shift so right edge stays at ox
+            if other.x + other.width == ox {
+                // no change needed, left neighbor stays put
+            }
+
+            // Bottom-aligned: re-align
+            if other.y + other.height == oy + old_h {
+                other.y = oy + new_h - other.height;
+            }
+            // Top-aligned: stays the same (both at same y)
+
+            // Touching below: shift vertically
+            if other.y == oy + old_h {
+                other.y = oy + new_h;
+            }
+            // Touching above: no change needed
+        }
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
@@ -512,25 +548,45 @@ mod tests {
     }
 
     #[test]
-    fn change_resolution_resnaps_to_neighbor() {
-        // B is snapped to the right edge of A, top-aligned
+    fn change_resolution_adjusts_right_neighbor() {
+        // B is snapped to the right edge of A, bottom-aligned
         let mut app = make_app(vec![
-            test_output("A", 0, 0, 1920, 1200),
-            test_output("B", 1920, 0, 2560, 1440),
+            test_output("A", 0, 0, 2560, 1440),
+            test_output("B", 2560, 360, 1920, 1080),
         ]);
-        app.selected = Some(1);
+        app.selected = Some(0);
 
-        // Change B to a smaller resolution
         let new_mode = Mode {
-            width: 800,
-            height: 600,
-            refresh: 75000,
+            width: 1920,
+            height: 1080,
+            refresh: 60000,
         };
         app.update(Message::ChangeResolution(new_mode));
 
-        // B should re-snap: left edge stays at A's right edge, top-aligned
+        // B should shift left to stay touching A's new right edge
         assert_eq!(app.outputs[1].x, 1920);
+        // B was bottom-aligned (360+1080=1440=0+1440), should re-align
         assert_eq!(app.outputs[1].y, 0);
-        assert_eq!(app.outputs[1].width, 800);
+    }
+
+    #[test]
+    fn change_resolution_preserves_unrelated_neighbor() {
+        // B is far away, not touching A
+        let mut app = make_app(vec![
+            test_output("A", 0, 0, 1920, 1080),
+            test_output("B", 3000, 500, 1920, 1080),
+        ]);
+        app.selected = Some(0);
+
+        let new_mode = Mode {
+            width: 2560,
+            height: 1440,
+            refresh: 60000,
+        };
+        app.update(Message::ChangeResolution(new_mode));
+
+        // B should not move
+        assert_eq!(app.outputs[1].x, 3000);
+        assert_eq!(app.outputs[1].y, 500);
     }
 }
