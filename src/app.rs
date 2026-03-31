@@ -456,11 +456,11 @@ mod tests {
     fn snap_no_snap_beyond_threshold() {
         let mut app = make_app(vec![
             test_output("A", 0, 0, 1920, 1080),
-            test_output("B", 2200, 200, 1920, 1080),
+            test_output("B", 2500, 500, 1920, 1080),
         ]);
         app.snap_output(1);
-        assert_eq!(app.outputs[1].x, 2200);
-        assert_eq!(app.outputs[1].y, 200);
+        assert_eq!(app.outputs[1].x, 2500);
+        assert_eq!(app.outputs[1].y, 500);
     }
 
     #[test]
