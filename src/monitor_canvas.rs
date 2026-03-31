@@ -112,7 +112,10 @@ fn draw_monitor(frame: &mut Frame, rect: Rectangle, output: &OutputInfo, is_sele
     });
 
     frame.fill_text(Text {
-        content: format!("{}x{}", output.current_mode.width, output.current_mode.height),
+        content: format!(
+            "{}x{}",
+            output.current_mode.width, output.current_mode.height
+        ),
         position: Point::new(cx, cy + 10.0),
         color: Color::from_rgb(0.8, 0.8, 0.8),
         size: 11.0.into(),
@@ -157,10 +160,8 @@ impl<'a> Program<CanvasMessage> for MonitorCanvas<'a> {
         if let Some(drag) = state.drag.as_ref().filter(|d| d.moved) {
             if let Some(output) = self.outputs.iter().find(|o| o.name == drag.name) {
                 let base_rect = output_rect(output, &si);
-                let rect = Rectangle::new(
-                    Point::new(drag.current_x, drag.current_y),
-                    base_rect.size(),
-                );
+                let rect =
+                    Rectangle::new(Point::new(drag.current_x, drag.current_y), base_rect.size());
                 draw_monitor(&mut frame, rect, output, true);
             }
         }
@@ -203,7 +204,8 @@ impl<'a> Program<CanvasMessage> for MonitorCanvas<'a> {
                             .filter(|&s| s < self.outputs.len())
                             .and_then(|s| {
                                 let rect = output_rect(&self.outputs[s], &si);
-                                rect.contains(pos).then(|| start_drag(s, &self.outputs[s], pos))
+                                rect.contains(pos)
+                                    .then(|| start_drag(s, &self.outputs[s], pos))
                             })
                             .or_else(|| {
                                 self.outputs.iter().enumerate().find_map(|(i, output)| {
@@ -229,10 +231,8 @@ impl<'a> Program<CanvasMessage> for MonitorCanvas<'a> {
                         drag.current_x = pos.x - drag.grab_offset_x;
                         drag.current_y = pos.y - drag.grab_offset_y;
                         let si = compute_scale(self.outputs, bounds);
-                        let real_x =
-                            ((drag.current_x - si.offset_x) / si.scale) as i32 + si.min_x;
-                        let real_y =
-                            ((drag.current_y - si.offset_y) / si.scale) as i32 + si.min_y;
+                        let real_x = ((drag.current_x - si.offset_x) / si.scale) as i32 + si.min_x;
+                        let real_y = ((drag.current_y - si.offset_y) / si.scale) as i32 + si.min_y;
                         return Some(Action::publish(CanvasMessage::DragMove {
                             name: drag.name.clone(),
                             x: real_x,
@@ -245,10 +245,8 @@ impl<'a> Program<CanvasMessage> for MonitorCanvas<'a> {
                 if let Some(drag) = state.drag.take() {
                     if drag.moved {
                         let si = compute_scale(self.outputs, bounds);
-                        let real_x =
-                            ((drag.current_x - si.offset_x) / si.scale) as i32 + si.min_x;
-                        let real_y =
-                            ((drag.current_y - si.offset_y) / si.scale) as i32 + si.min_y;
+                        let real_x = ((drag.current_x - si.offset_x) / si.scale) as i32 + si.min_x;
+                        let real_y = ((drag.current_y - si.offset_y) / si.scale) as i32 + si.min_y;
                         return Some(Action::publish(CanvasMessage::DragEnd {
                             name: drag.name,
                             x: real_x,

@@ -234,11 +234,11 @@ impl App {
 
             // Y: top, center, bottom alignment + above/below stacking
             for snap_y in [
-                ay + ah - oh, // bottom-aligned
-                ay,           // top-aligned
+                ay + ah - oh,         // bottom-aligned
+                ay,                   // top-aligned
                 ay + ah / 2 - oh / 2, // center-aligned
-                ay + ah,      // stacked below
-                ay - oh,      // stacked above
+                ay + ah,              // stacked below
+                ay - oh,              // stacked above
             ] {
                 let d = (oy - snap_y).abs();
                 if d < min_dy {
