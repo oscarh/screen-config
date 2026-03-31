@@ -10,7 +10,14 @@ pub enum Message {
     ChangeResolution(Mode),
     SetMirror(bool),
     Apply,
+    Close,
     CanvasMessage(monitor_canvas::CanvasMessage),
+}
+
+struct DragInfo {
+    name: String,
+    origin: (i32, i32),
+    last_swapped: Option<String>,
 }
 
 pub struct App {
@@ -19,6 +26,7 @@ pub struct App {
     mirror_mode: bool,
     saved_positions: Vec<(i32, i32)>,
     status: String,
+    drag: Option<DragInfo>,
 }
 
 impl Default for App {
@@ -33,6 +41,7 @@ impl Default for App {
             mirror_mode: false,
             saved_positions: vec![],
             status,
+            drag: None,
         }
     }
 }
@@ -62,14 +71,25 @@ impl App {
             Message::CanvasMessage(monitor_canvas::CanvasMessage::SelectOutput(idx)) => {
                 if idx < self.outputs.len() {
                     self.selected = Some(idx);
+                    let out = &self.outputs[idx];
+                    self.drag = Some(DragInfo {
+                        name: out.name.clone(),
+                        origin: (out.x, out.y),
+                        last_swapped: None,
+                    });
                 }
             }
-            Message::CanvasMessage(monitor_canvas::CanvasMessage::DragEnd { index, x, y }) => {
-                if index < self.outputs.len() {
-                    self.outputs[index].x = x;
-                    self.outputs[index].y = y;
-                    self.snap_output(index);
+            Message::CanvasMessage(monitor_canvas::CanvasMessage::DragMove { name, x, y }) => {
+                self.handle_drag_move(&name, x, y);
+            }
+            Message::CanvasMessage(monitor_canvas::CanvasMessage::DragEnd { name, x, y }) => {
+                if let Some(idx) = self.outputs.iter().position(|o| o.name == name) {
+                    self.outputs[idx].x = x;
+                    self.outputs[idx].y = y;
+                    self.snap_output(idx);
+                    self.selected = Some(idx);
                 }
+                self.drag = None;
             }
             Message::ChangeResolution(mode) => {
                 if let Some(sel) = self.selected {
@@ -96,6 +116,9 @@ impl App {
                     self.saved_positions.clear();
                 }
             }
+            Message::Close => {
+                std::process::exit(0);
+            }
             Message::Apply => match sway::apply_config(&self.outputs, self.mirror_mode) {
                 Ok(()) => {
                     self.status = "Configuration applied.".to_string();
@@ -117,21 +140,74 @@ impl App {
         }
     }
 
-    fn recalculate_positions(&mut self) {
-        let max_h = self.outputs.iter().map(|o| o.height).max().unwrap_or(0);
-        let mut x = 0;
-        for output in &mut self.outputs {
-            output.x = x;
-            output.y = max_h - output.height;
-            x += output.width;
+    fn handle_drag_move(&mut self, name: &str, drag_x: i32, drag_y: i32) {
+        let drag = match &mut self.drag {
+            Some(d) if d.name == name => d,
+            _ => return,
+        };
+
+        let drag_idx = match self.outputs.iter().position(|o| o.name == name) {
+            Some(i) => i,
+            None => return,
+        };
+
+        let drag_w = self.outputs[drag_idx].width;
+        let drag_h = self.outputs[drag_idx].height;
+        let drag_cx = drag_x + drag_w / 2;
+        let drag_cy = drag_y + drag_h / 2;
+
+        let mut swap_target = None;
+
+        for (i, other) in self.outputs.iter().enumerate() {
+            if i == drag_idx {
+                continue;
+            }
+            let other_cx = other.x + other.width / 2;
+            let other_cy = other.y + other.height / 2;
+
+            let in_x = drag_cx > other.x && drag_cx < other.x + other.width;
+            let in_y = drag_cy > other.y && drag_cy < other.y + other.height;
+
+            if in_x && in_y {
+                if drag.last_swapped.as_deref() == Some(other.name.as_str()) {
+                    // Check if we've crossed their center (commit to the swap)
+                    let origin_cx = drag.origin.0 + drag_w / 2;
+                    let origin_cy = drag.origin.1 + drag_h / 2;
+                    let crossed_x = (origin_cx < other_cx && drag_cx >= other_cx)
+                        || (origin_cx > other_cx && drag_cx <= other_cx);
+                    let crossed_y = (origin_cy < other_cy && drag_cy >= other_cy)
+                        || (origin_cy > other_cy && drag_cy <= other_cy);
+                    if !crossed_x && !crossed_y {
+                        continue;
+                    }
+                }
+                swap_target = Some(i);
+                break;
+            }
+        }
+
+        if let Some(target_idx) = swap_target {
+            let target_pos = (self.outputs[target_idx].x, self.outputs[target_idx].y);
+            let target_name = self.outputs[target_idx].name.clone();
+
+            self.outputs[target_idx].x = drag.origin.0;
+            self.outputs[target_idx].y = drag.origin.1;
+
+            drag.origin = target_pos;
+            drag.last_swapped = Some(target_name);
+
+            // Update selected to follow dragged monitor
+            if let Some(new_idx) = self.outputs.iter().position(|o| o.name == name) {
+                self.selected = Some(new_idx);
+            }
         }
     }
 
     fn snap_output(&mut self, idx: usize) {
-        let snap_threshold = 100;
+        let threshold = 300;
         let out = &self.outputs[idx];
         let (mut best_x, mut best_y) = (out.x, out.y);
-        let (mut min_dx, mut min_dy) = (snap_threshold, snap_threshold);
+        let (mut min_dx, mut min_dy) = (threshold + 1, threshold + 1);
         let (ox, oy, ow, oh) = (out.x, out.y, out.width, out.height);
 
         for (i, other) in self.outputs.iter().enumerate() {
@@ -140,47 +216,50 @@ impl App {
             }
             let (ax, ay, aw, ah) = (other.x, other.y, other.width, other.height);
 
-            // Snap left edge to right edge of other
-            let d = (ox - (ax + aw)).abs();
-            if d < min_dx {
-                min_dx = d;
-                best_x = ax + aw;
+            // X: edge-to-edge snapping
+            for snap_x in [ax + aw, ax - ow] {
+                let d = (ox - snap_x).abs();
+                if d < min_dx {
+                    min_dx = d;
+                    best_x = snap_x;
+                }
             }
-            // Snap right edge to left edge of other
-            let d = ((ox + ow) - ax).abs();
+            // X: center-to-center alignment
+            let snap_x = ax + aw / 2 - ow / 2;
+            let d = (ox - snap_x).abs();
             if d < min_dx {
                 min_dx = d;
-                best_x = ax - ow;
+                best_x = snap_x;
             }
 
-            // Snap bottom edges together
-            let d = ((oy + oh) - (ay + ah)).abs();
-            if d < min_dy {
-                min_dy = d;
-                best_y = ay + ah - oh;
-            }
-            // Snap top edges together
-            let d = (oy - ay).abs();
-            if d < min_dy {
-                min_dy = d;
-                best_y = ay;
-            }
-            // Snap top to bottom of other
-            let d = (oy - (ay + ah)).abs();
-            if d < min_dy {
-                min_dy = d;
-                best_y = ay + ah;
-            }
-            // Snap bottom to top of other
-            let d = ((oy + oh) - ay).abs();
-            if d < min_dy {
-                min_dy = d;
-                best_y = ay - oh;
+            // Y: top, center, bottom alignment + above/below stacking
+            for snap_y in [
+                ay + ah - oh, // bottom-aligned
+                ay,           // top-aligned
+                ay + ah / 2 - oh / 2, // center-aligned
+                ay + ah,      // stacked below
+                ay - oh,      // stacked above
+            ] {
+                let d = (oy - snap_y).abs();
+                if d < min_dy {
+                    min_dy = d;
+                    best_y = snap_y;
+                }
             }
         }
 
         self.outputs[idx].x = best_x;
         self.outputs[idx].y = best_y;
+    }
+
+    fn recalculate_positions(&mut self) {
+        let max_h = self.outputs.iter().map(|o| o.height).max().unwrap_or(0);
+        let mut x = 0;
+        for output in &mut self.outputs {
+            output.x = x;
+            output.y = max_h - output.height;
+            x += output.width;
+        }
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
@@ -261,10 +340,15 @@ impl App {
         };
 
         container(
-            column![mirror_controls, canvas, controls]
-                .spacing(15)
-                .padding(15)
-                .align_x(iced::Alignment::Center),
+            column![
+                mirror_controls,
+                canvas,
+                controls,
+                button("Close").on_press(Message::Close),
+            ]
+            .spacing(15)
+            .padding(15)
+            .align_x(iced::Alignment::Center),
         )
         .width(Length::Fill)
         .height(Length::Fill)
@@ -304,6 +388,7 @@ mod tests {
             mirror_mode: false,
             saved_positions: vec![],
             status: String::new(),
+            drag: None,
         }
     }
 
@@ -336,49 +421,68 @@ mod tests {
     }
 
     #[test]
-    fn snap_output_snaps_to_right_edge() {
+    fn snap_edge_to_edge_horizontal() {
         let mut app = make_app(vec![
             test_output("A", 0, 0, 1920, 1080),
-            test_output("B", 1950, 0, 2560, 1080),
+            test_output("B", 1950, 0, 1920, 1080),
         ]);
         app.snap_output(1);
-
         assert_eq!(app.outputs[1].x, 1920);
     }
 
     #[test]
-    fn snap_output_snaps_to_left_edge() {
+    fn snap_bottom_aligned() {
         let mut app = make_app(vec![
             test_output("A", 0, 0, 1920, 1080),
-            test_output("B", -2590, 0, 2560, 1080),
+            test_output("B", 1920, 50, 2560, 1440),
         ]);
+        // B bottom at 50+1440=1490, A bottom at 1080. Closest y snap: top-aligned (0) at dist 50
         app.snap_output(1);
-
-        assert_eq!(app.outputs[1].x, -2560);
-    }
-
-    #[test]
-    fn snap_output_snaps_bottom_edges() {
-        let mut app = make_app(vec![
-            test_output("A", 0, 0, 1920, 1080),
-            test_output("B", 1920, -330, 2560, 1440),
-        ]);
-        // B bottom at -330+1440=1110, A bottom at 1080. Diff = 30, within threshold.
-        app.snap_output(1);
-
-        assert_eq!(app.outputs[1].y, 1080 - 1440);
-    }
-
-    #[test]
-    fn snap_output_no_snap_beyond_threshold() {
-        let mut app = make_app(vec![
-            test_output("A", 0, 0, 1920, 1080),
-            test_output("B", 2200, 0, 2560, 1080),
-        ]);
-        app.snap_output(1);
-
-        assert_eq!(app.outputs[1].x, 2200);
         assert_eq!(app.outputs[1].y, 0);
+    }
+
+    #[test]
+    fn snap_center_aligned_x() {
+        let mut app = make_app(vec![
+            test_output("A", 0, 0, 1920, 1080),
+            test_output("B", 10, -1080, 1920, 1080),
+        ]);
+        // B x center should snap to A x center: both 1920 wide, so snap to x=0
+        app.snap_output(1);
+        assert_eq!(app.outputs[1].x, 0);
+    }
+
+    #[test]
+    fn snap_no_snap_beyond_threshold() {
+        let mut app = make_app(vec![
+            test_output("A", 0, 0, 1920, 1080),
+            test_output("B", 2200, 200, 1920, 1080),
+        ]);
+        app.snap_output(1);
+        assert_eq!(app.outputs[1].x, 2200);
+        assert_eq!(app.outputs[1].y, 200);
+    }
+
+    #[test]
+    fn live_swap_when_dragged_into_other() {
+        let mut app = make_app(vec![
+            test_output("A", 0, 0, 1920, 1080),
+            test_output("B", 1920, 0, 1920, 1080),
+        ]);
+        app.drag = Some(DragInfo {
+            name: "A".to_string(),
+            origin: (0, 0),
+            last_swapped: None,
+        });
+
+        // Drag A's center into B's bounds
+        app.handle_drag_move("A", 1960, 0);
+
+        // B should have moved to A's origin
+        assert_eq!(app.outputs[1].x, 0);
+        assert_eq!(app.outputs[1].y, 0);
+        // drag origin should be B's old position
+        assert_eq!(app.drag.as_ref().unwrap().origin, (1920, 0));
     }
 
     #[test]

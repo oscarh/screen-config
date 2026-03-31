@@ -5,30 +5,20 @@ A simple GUI tool for managing monitor layout in [Sway](https://swaywm.org/).
 ## Features
 
 - Visual monitor layout with drag-and-drop repositioning
-- Edge snapping when placing monitors
+- Live reordering while dragging (monitors swap when dragged past each other)
+- Edge and alignment snapping (top, center, bottom)
+- Free positioning: side-by-side, above, or below
 - Resolution selection per monitor
 - Extend / Mirror mode toggle
 - Auto-detects monitor connect/disconnect via Sway IPC events
-- Bottom-aligned monitor layout
 
 ## Screenshot
 
-```
-+--------------------------------------------------+
-|          (o) Extend  ( ) Mirror                   |
-+--------------------------------------------------+
-|          +------+  +-----------+                  |
-|          | eDP-1|  |   DP-1    |                  |
-|          +------+  +-----------+                  |
-+--------------------------------------------------+
-|           DP-1 (Dell U2715D)                      |
-|       [1920x1080 @ 60Hz  v]  [Apply]              |
-+--------------------------------------------------+
-```
+![sc screenshot](docs/screenshot.png)
 
 ## Building
 
-Requires Rust 1.75+.
+Requires Rust 1.88+.
 
 ```sh
 cargo build --release
@@ -51,10 +41,12 @@ for_window [title="sc - Screen Config"] floating enable
 ## Usage
 
 Launch `sc` from a terminal or application launcher. Click a monitor in the
-canvas to select it, drag to reposition. Select a resolution from the dropdown
-and click Apply to send the configuration to Sway.
+canvas to select it, drag to reposition. Monitors swap live when dragged past
+each other. On release, the monitor snaps to the nearest edge or alignment of
+its neighbors.
 
-Mirror mode sets all outputs to position 0,0 with a common resolution.
+Select a resolution from the dropdown and click Apply to send the configuration
+to Sway. Mirror mode sets all outputs to position 0,0 with a common resolution.
 
 ## Dependencies
 
