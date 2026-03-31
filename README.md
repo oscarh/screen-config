@@ -35,7 +35,7 @@ cp target/release/sc ~/.local/bin/
 To make the window float in Sway, add to `~/.config/sway/config`:
 
 ```
-for_window [title="sc - Screen Config"] floating enable
+for_window [app_id="simple_sway_screen_config"] floating enable
 ```
 
 ## Usage
