@@ -9,9 +9,9 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    container: rust:1.85-bookworm
+    container: rust:1.88-bookworm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check
         run: cargo check --release
@@ -20,23 +20,23 @@ jobs:
         run: cargo clippy --release -- -D warnings
 
       - name: Format
-        run: rustfmt --check src/*.rs
+        run: cargo fmt -- --check
 
       - name: Test
         run: cargo test
 
   build:
     runs-on: ubuntu-latest
-    container: rust:1.85-bookworm
+    container: rust:1.88-bookworm
     needs: check
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build
         run: cargo build --release
 
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sc
           path: target/release/sc

@@ -83,8 +83,7 @@ impl App {
             }
             Message::SetMirror(mirror) => {
                 if mirror && !self.mirror_mode {
-                    self.saved_positions =
-                        self.outputs.iter().map(|o| (o.x, o.y)).collect();
+                    self.saved_positions = self.outputs.iter().map(|o| (o.x, o.y)).collect();
                     self.mirror_mode = true;
                 } else if !mirror && self.mirror_mode {
                     for (i, output) in self.outputs.iter_mut().enumerate() {
@@ -97,26 +96,24 @@ impl App {
                     self.saved_positions.clear();
                 }
             }
-            Message::Apply => {
-                match sway::apply_config(&self.outputs, self.mirror_mode) {
-                    Ok(()) => {
-                        self.status = "Configuration applied.".to_string();
-                        if let Ok(outputs) = sway::get_outputs() {
-                            self.outputs = outputs;
-                            if let Some(sel) = self.selected {
-                                if sel >= self.outputs.len() {
-                                    self.selected = if self.outputs.is_empty() {
-                                        None
-                                    } else {
-                                        Some(0)
-                                    };
-                                }
+            Message::Apply => match sway::apply_config(&self.outputs, self.mirror_mode) {
+                Ok(()) => {
+                    self.status = "Configuration applied.".to_string();
+                    if let Ok(outputs) = sway::get_outputs() {
+                        self.outputs = outputs;
+                        if let Some(sel) = self.selected {
+                            if sel >= self.outputs.len() {
+                                self.selected = if self.outputs.is_empty() {
+                                    None
+                                } else {
+                                    Some(0)
+                                };
                             }
                         }
                     }
-                    Err(e) => self.status = format!("Apply failed: {}", e),
                 }
-            }
+                Err(e) => self.status = format!("Apply failed: {}", e),
+            },
         }
     }
 
@@ -188,29 +185,32 @@ impl App {
 
     pub fn subscription(&self) -> Subscription<Message> {
         Subscription::run(|| {
-            iced::stream::channel(1, |mut sender: iced::futures::channel::mpsc::Sender<Message>| async move {
-                let (tx, mut rx) = iced::futures::channel::mpsc::channel::<()>(1);
-                std::thread::spawn(move || {
-                    let conn = match swayipc::Connection::new() {
-                        Ok(c) => c,
-                        Err(_) => return,
-                    };
-                    let events = match conn.subscribe([swayipc::EventType::Output]) {
-                        Ok(e) => e,
-                        Err(_) => return,
-                    };
-                    let mut tx = tx;
-                    for _ in events.flatten() {
-                        if tx.try_send(()).is_err() {
-                            break;
+            iced::stream::channel(
+                1,
+                |mut sender: iced::futures::channel::mpsc::Sender<Message>| async move {
+                    let (tx, mut rx) = iced::futures::channel::mpsc::channel::<()>(1);
+                    std::thread::spawn(move || {
+                        let conn = match swayipc::Connection::new() {
+                            Ok(c) => c,
+                            Err(_) => return,
+                        };
+                        let events = match conn.subscribe([swayipc::EventType::Output]) {
+                            Ok(e) => e,
+                            Err(_) => return,
+                        };
+                        let mut tx = tx;
+                        for _ in events.flatten() {
+                            if tx.try_send(()).is_err() {
+                                break;
+                            }
                         }
+                    });
+                    use iced::futures::{SinkExt, StreamExt};
+                    while rx.next().await.is_some() {
+                        let _ = sender.send(Message::CheckOutputs).await;
                     }
-                });
-                use iced::futures::{SinkExt, StreamExt};
-                while rx.next().await.is_some() {
-                    let _ = sender.send(Message::CheckOutputs).await;
-                }
-            })
+                },
+            )
         })
     }
 
@@ -219,10 +219,8 @@ impl App {
             .map(Message::CanvasMessage);
 
         let mirror_controls = row![
-            radio("Extend", false, Some(self.mirror_mode), Message::SetMirror)
-                .spacing(5),
-            radio("Mirror", true, Some(self.mirror_mode), Message::SetMirror)
-                .spacing(5),
+            radio("Extend", false, Some(self.mirror_mode), Message::SetMirror).spacing(5),
+            radio("Mirror", true, Some(self.mirror_mode), Message::SetMirror).spacing(5),
         ]
         .spacing(20)
         .align_y(iced::Alignment::Center);
@@ -230,8 +228,11 @@ impl App {
         let controls: Element<Message> = if let Some(sel) = self.selected {
             let output = &self.outputs[sel];
 
-            let info =
-                text(format!("{} ({} {})", output.name, output.make, output.model)).size(16);
+            let info = text(format!(
+                "{} ({} {})",
+                output.name, output.make, output.model
+            ))
+            .size(16);
 
             let modes: Vec<Mode> = if self.mirror_mode {
                 common_modes(&self.outputs)
@@ -382,8 +383,16 @@ mod tests {
 
     #[test]
     fn common_modes_returns_shared_resolutions() {
-        let mode_a = Mode { width: 1920, height: 1080, refresh: 60000 };
-        let mode_b = Mode { width: 2560, height: 1440, refresh: 60000 };
+        let mode_a = Mode {
+            width: 1920,
+            height: 1080,
+            refresh: 60000,
+        };
+        let mode_b = Mode {
+            width: 2560,
+            height: 1440,
+            refresh: 60000,
+        };
 
         let mut out1 = test_output("A", 0, 0, 1920, 1080);
         out1.modes = vec![mode_a.clone(), mode_b.clone()];
@@ -404,8 +413,16 @@ mod tests {
     fn common_modes_single_output_returns_all() {
         let mut out = test_output("A", 0, 0, 1920, 1080);
         out.modes = vec![
-            Mode { width: 1920, height: 1080, refresh: 60000 },
-            Mode { width: 1280, height: 720, refresh: 60000 },
+            Mode {
+                width: 1920,
+                height: 1080,
+                refresh: 60000,
+            },
+            Mode {
+                width: 1280,
+                height: 720,
+                refresh: 60000,
+            },
         ];
         let common = common_modes(&[out.clone()]);
         assert_eq!(common, out.modes);
@@ -436,7 +453,11 @@ mod tests {
         ]);
         app.selected = Some(0);
 
-        let new_mode = Mode { width: 2560, height: 1440, refresh: 60000 };
+        let new_mode = Mode {
+            width: 2560,
+            height: 1440,
+            refresh: 60000,
+        };
         app.update(Message::ChangeResolution(new_mode));
 
         assert_eq!(app.outputs[0].x, 0);

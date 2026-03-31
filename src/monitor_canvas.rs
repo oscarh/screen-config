@@ -106,17 +106,20 @@ fn draw_monitor(frame: &mut Frame, rect: Rectangle, output: &OutputInfo, is_sele
         color: Color::WHITE,
         size: 14.0.into(),
         align_x: iced::alignment::Horizontal::Center.into(),
-        align_y: iced::alignment::Vertical::Center.into(),
+        align_y: iced::alignment::Vertical::Center,
         ..Text::default()
     });
 
     frame.fill_text(Text {
-        content: format!("{}x{}", output.current_mode.width, output.current_mode.height),
+        content: format!(
+            "{}x{}",
+            output.current_mode.width, output.current_mode.height
+        ),
         position: Point::new(cx, cy + 10.0),
         color: Color::from_rgb(0.8, 0.8, 0.8),
         size: 11.0.into(),
         align_x: iced::alignment::Horizontal::Center.into(),
-        align_y: iced::alignment::Vertical::Center.into(),
+        align_y: iced::alignment::Vertical::Center,
         ..Text::default()
     });
 }
@@ -152,10 +155,7 @@ impl<'a> Program<CanvasMessage> for MonitorCanvas<'a> {
         if let Some(drag) = state.drag.as_ref().filter(|d| d.moved) {
             let output = &self.outputs[drag.index];
             let base_rect = output_rect(output, &si);
-            let rect = Rectangle::new(
-                Point::new(drag.current_x, drag.current_y),
-                base_rect.size(),
-            );
+            let rect = Rectangle::new(Point::new(drag.current_x, drag.current_y), base_rect.size());
             draw_monitor(&mut frame, rect, output, true);
         }
 
@@ -212,10 +212,8 @@ impl<'a> Program<CanvasMessage> for MonitorCanvas<'a> {
                 if let Some(drag) = state.drag.take() {
                     if drag.moved {
                         let si = compute_scale(self.outputs, bounds);
-                        let real_x =
-                            ((drag.current_x - si.offset_x) / si.scale) as i32 + si.min_x;
-                        let real_y =
-                            ((drag.current_y - si.offset_y) / si.scale) as i32 + si.min_y;
+                        let real_x = ((drag.current_x - si.offset_x) / si.scale) as i32 + si.min_x;
+                        let real_y = ((drag.current_y - si.offset_y) / si.scale) as i32 + si.min_y;
                         return Some(Action::publish(CanvasMessage::DragEnd {
                             index: drag.index,
                             x: real_x,

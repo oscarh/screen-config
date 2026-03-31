@@ -55,20 +55,31 @@ mod tests {
 
     #[test]
     fn mode_display_60hz() {
-        let mode = Mode { width: 1920, height: 1080, refresh: 60000 };
+        let mode = Mode {
+            width: 1920,
+            height: 1080,
+            refresh: 60000,
+        };
         assert_eq!(mode.to_string(), "1920x1080 @ 60Hz");
     }
 
     #[test]
     fn mode_display_144hz() {
-        let mode = Mode { width: 2560, height: 1440, refresh: 144000 };
+        let mode = Mode {
+            width: 2560,
+            height: 1440,
+            refresh: 144000,
+        };
         assert_eq!(mode.to_string(), "2560x1440 @ 144Hz");
     }
 
     #[test]
     fn mode_display_rounds_refresh() {
-        let mode = Mode { width: 1920, height: 1080, refresh: 60027 };
+        let mode = Mode {
+            width: 1920,
+            height: 1080,
+            refresh: 60027,
+        };
         assert_eq!(mode.to_string(), "1920x1080 @ 60Hz");
     }
 }
-
