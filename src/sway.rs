@@ -66,5 +66,8 @@ pub fn apply_config(outputs: &[OutputInfo], mirror: bool) -> Result<(), String> 
         }
     }
 
+    // Refocus our window since output changes may move the cursor to another screen
+    let _ = conn.run_command(format!("[app_id={}] focus", crate::APP_ID));
+
     Ok(())
 }
