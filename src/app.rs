@@ -97,7 +97,7 @@ impl App {
                         self.outputs[sel].width = mode.width;
                         self.outputs[sel].height = mode.height;
                         self.outputs[sel].current_mode = mode;
-                        self.recalculate_positions();
+                        self.snap_output(sel);
                     }
                 }
             }
@@ -252,16 +252,6 @@ impl App {
         self.outputs[idx].y = best_y;
     }
 
-    fn recalculate_positions(&mut self) {
-        let max_h = self.outputs.iter().map(|o| o.height).max().unwrap_or(0);
-        let mut x = 0;
-        for output in &mut self.outputs {
-            output.x = x;
-            output.y = max_h - output.height;
-            x += output.width;
-        }
-    }
-
     pub fn subscription(&self) -> Subscription<Message> {
         Subscription::run(|| {
             iced::stream::channel(
@@ -390,34 +380,6 @@ mod tests {
             status: String::new(),
             drag: None,
         }
-    }
-
-    #[test]
-    fn recalculate_positions_bottom_aligns() {
-        let mut app = make_app(vec![
-            test_output("A", 0, 0, 1920, 1080),
-            test_output("B", 0, 0, 2560, 1440),
-        ]);
-        app.recalculate_positions();
-
-        assert_eq!(app.outputs[0].x, 0);
-        assert_eq!(app.outputs[0].y, 1440 - 1080);
-        assert_eq!(app.outputs[1].x, 1920);
-        assert_eq!(app.outputs[1].y, 0);
-    }
-
-    #[test]
-    fn recalculate_positions_same_height() {
-        let mut app = make_app(vec![
-            test_output("A", 0, 0, 1920, 1080),
-            test_output("B", 0, 0, 1920, 1080),
-        ]);
-        app.recalculate_positions();
-
-        assert_eq!(app.outputs[0].x, 0);
-        assert_eq!(app.outputs[0].y, 0);
-        assert_eq!(app.outputs[1].x, 1920);
-        assert_eq!(app.outputs[1].y, 0);
     }
 
     #[test]
@@ -550,22 +512,25 @@ mod tests {
     }
 
     #[test]
-    fn change_resolution_recalculates_positions() {
+    fn change_resolution_resnaps_to_neighbor() {
+        // B is snapped to the right edge of A, top-aligned
         let mut app = make_app(vec![
-            test_output("A", 0, 0, 1920, 1080),
+            test_output("A", 0, 0, 1920, 1200),
             test_output("B", 1920, 0, 2560, 1440),
         ]);
-        app.selected = Some(0);
+        app.selected = Some(1);
 
+        // Change B to a smaller resolution
         let new_mode = Mode {
-            width: 2560,
-            height: 1440,
-            refresh: 60000,
+            width: 800,
+            height: 600,
+            refresh: 75000,
         };
         app.update(Message::ChangeResolution(new_mode));
 
-        assert_eq!(app.outputs[0].x, 0);
-        assert_eq!(app.outputs[0].width, 2560);
-        assert_eq!(app.outputs[1].x, 2560);
+        // B should re-snap: left edge stays at A's right edge, top-aligned
+        assert_eq!(app.outputs[1].x, 1920);
+        assert_eq!(app.outputs[1].y, 0);
+        assert_eq!(app.outputs[1].width, 800);
     }
 }
