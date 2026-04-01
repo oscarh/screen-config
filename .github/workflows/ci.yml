@@ -42,5 +42,5 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v7
         with:
-          name: sc
-          path: target/release/sc
+          name: smc
+          path: target/release/smc

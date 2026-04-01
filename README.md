@@ -1,4 +1,4 @@
-# sc - Sway Screen Configuration
+# smc - Simple Monitor Configuration for Sway
 
 A simple GUI tool for managing monitor layout in [Sway](https://swaywm.org/).
 
@@ -14,7 +14,7 @@ A simple GUI tool for managing monitor layout in [Sway](https://swaywm.org/).
 
 ## Screenshot
 
-![sc screenshot](docs/screenshot.png)
+![smc screenshot](docs/screenshot.png)
 
 ## Building
 
@@ -24,23 +24,23 @@ Requires Rust 1.88+.
 cargo build --release
 ```
 
-The binary is at `target/release/sc`.
+The binary is at `target/release/smc`.
 
 ## Installation
 
 ```sh
-cp target/release/sc ~/.local/bin/
+cp target/release/smc ~/.local/bin/
 ```
 
 To make the window float in Sway, add to `~/.config/sway/config`:
 
 ```
-for_window [app_id="simple_sway_screen_config"] floating enable
+for_window [app_id="simple_sway_monitor_config"] floating enable
 ```
 
 ## Usage
 
-Launch `sc` from a terminal or application launcher. Click a monitor in the
+Launch `smc` from a terminal or application launcher. Click a monitor in the
 canvas to select it, drag to reposition. Monitors swap live when dragged past
 each other. On release, the monitor snaps to the nearest edge or alignment of
 its neighbors.

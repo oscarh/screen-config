@@ -5,7 +5,7 @@ mod types;
 
 use app::App;
 
-pub const APP_ID: &str = "simple_sway_screen_config";
+pub const APP_ID: &str = "simple_sway_monitor_config";
 
 fn theme(_: &App) -> iced::Theme {
     iced::Theme::Dark
@@ -13,7 +13,7 @@ fn theme(_: &App) -> iced::Theme {
 
 fn main() -> iced::Result {
     iced::application(App::default, App::update, App::view)
-        .title("Screen Config")
+        .title("Monitor Config")
         .subscription(App::subscription)
         .window(iced::window::Settings {
             size: iced::Size::new(600.0, 500.0),

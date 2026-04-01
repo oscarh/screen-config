@@ -1,10 +1,10 @@
 [package]
-name = "screen-config"
-version = "0.1.0"
+name = "simple-monitor-config"
+version = "0.2.0"
 edition = "2021"
 
 [[bin]]
-name = "sc"
+name = "smc"
 path = "src/main.rs"
 
 [dependencies]
